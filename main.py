@@ -13,7 +13,6 @@ def list_changed(list_1, list_2):
 
     return False
 
-
 class Main:
  
     def __init__(self):
@@ -21,21 +20,28 @@ class Main:
         self.window_size = 500
         self.exit = False
         self.bricks = []
-        self.paddle = Paddle(self.window_size / 2 - 25, self.window_size - 20)
-
-        ball_radius = 5
-        ball_starting_pos = {
-            "x": self.window_size / 2,
-            "y": self.paddle.y - ball_radius,
-        }
-
-        self.ball = Ball(ball_starting_pos["x"], ball_starting_pos["y"], 0, 0, 5, "white")
-        self.player_pos = pygame.Vector2(ball_starting_pos["x"], ball_starting_pos["y"])
+        self.paddle = None
+        self.ball = None
+        self.player_pos = None
+        self.lives = 3
  
     # Will initialise the beginning of the game, create all essential objects etc.
     def setup(self, canvas: pygame.Surface, bricks: list[Brick]):
+        self.generate_objects()
+
+        self.update(canvas, bricks)
+
+    
+    def update(self, canvas: pygame.Surface, bricks: list[Brick]):
         for brick in bricks:
             pygame.draw.rect(canvas, "red", pygame.Rect(brick.x, brick.y, brick.width, brick.height))
+
+        # Lives text
+        font = pygame.font.Font('freesansbold.ttf', 12)
+        text = font.render(f'Lives: {self.lives}', True, "white")
+        text_rect = text.get_rect()
+        text_rect.center = (30, 10)
+        canvas.blit(text, text_rect)
 
         pygame.draw.rect(canvas, "white", pygame.Rect(self.paddle.x, self.paddle.y, self.paddle.width, self.paddle.height))
         pygame.draw.circle(canvas, "white", self.player_pos, self.ball.radius)
@@ -69,7 +75,7 @@ class Main:
             self.handle_events()
  
             pygame.display.update()
-            dt = clock.tick(30) / 1000
+            dt = clock.tick(60) / 1000
  
  
     # Runs every frame. What will happen each frame
@@ -81,7 +87,47 @@ class Main:
         keys = pygame.key.get_pressed()
  
         self.react_to_user_input(keys)
- 
+
+    def handle_edge_bounce(self, ball: Ball) -> None:
+        ball_left_edge = ball.x - ball.radius
+        ball_right_edge = ball.x + ball.radius
+        ball_top_edge = ball.y - ball.radius
+
+        if (ball_left_edge <= 0 or ball_right_edge >= self.window_size) and (ball.y > self.window_size):
+            ball.bounce('xy')
+        elif ball_left_edge <= 0 or ball_right_edge >= self.window_size:
+            ball.bounce('x')
+        elif ball_top_edge <= 0:
+            ball.bounce('y')
+        elif ball_top_edge >= self.window_size:
+            self.reset()
+
+    def generate_objects(self):
+        self.bricks = []
+
+        self.generate_bricks()
+
+        self.paddle = Paddle(self.window_size / 2 - 25, self.window_size - 20)
+
+        ball_radius = 5
+        ball_starting_pos = {
+            "x": self.window_size / 2,
+            "y": self.paddle.y - ball_radius,
+        }
+
+        self.ball = Ball(ball_starting_pos["x"], ball_starting_pos["y"], 0, 0, 5, "white")
+        self.player_pos = pygame.Vector2(ball_starting_pos["x"], ball_starting_pos["y"])
+
+    def reset(self):
+        self.lives -= 1
+        if self.lives <= 0:
+            self.lose()
+
+        self.generate_objects()
+        
+
+    def lose(self):
+        self.exit = True
 
     # Will redraw the screen each frame
     def draw(self, canvas: pygame.Surface, bricks: list[Brick]):
@@ -90,28 +136,33 @@ class Main:
         self.ball.move()
         self.player_pos.x = self.ball.x
         self.player_pos.y = self.ball.y
+
+        self.handle_edge_bounce(self.ball)
+
         collision = self.ball.check_collision(self.paddle, bricks)
 
         if collision:
             if isinstance(collision, Paddle):
-                if self.ball.vy > 0 and self.ball.vx > 0:
-                    self.ball.paddle_hit(45, (self.ball.x - self.paddle.x) / self.paddle.width)
-                    self.ball.bounce("y")
-                    
-            elif isinstance(collision, Brick):
-                self.ball.bounce("x")
+                if self.ball.vy > 0 or self.ball.vx > 0:
+                    self.ball.paddle_hit(45, self.paddle)
 
-        self.setup(canvas, bricks)
+            elif isinstance(collision, Brick):
+                collision.damage()
+                if collision.is_destroyed():
+                    bricks.remove(collision)
+                self.ball.bounce("y")
+
+        self.update(canvas, bricks)
 
         pygame.display.flip()
 
  
     def react_to_user_input(self, keysPressed):
         if keysPressed[pygame.K_a] or keysPressed[pygame.K_LEFT]:
-            pass
+            self.paddle.move('left')
 
         if keysPressed[pygame.K_d] or keysPressed[pygame.K_RIGHT]:
-            pass
+            self.paddle.move('right')
 
         if keysPressed[pygame.K_w] or keysPressed[pygame.K_UP]:
             self.ball.begin()

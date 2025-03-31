@@ -38,13 +38,33 @@ class Ball:
             self.vx = -self.vx
             self.vy = -self.vy
 
-    def paddle_hit(self, max_angle: int, paddle_position: float) -> None:
-        angle = max_angle * paddle_position
+    def paddle_hit(self, max_angle: int, paddle: Paddle) -> None:
+        paddle_midpoint = paddle.x + paddle.width / 2
+        paddle_position = (self.x - paddle_midpoint) / (paddle.width / 2)
+
+        print(f'Ball position: {self.x}, Paddle midpoint: {paddle_midpoint}, Paddle position: {paddle_position}')
+
+        angle = 90 - max_angle * paddle_position
+
+        print(f'Paddle position: {paddle_position}, Angle: {angle}')
 
         angle_rad = math.radians(angle)
 
-        self.vx = self.speed * math.cos(angle_rad)
-        self.vy = self.speed * math.sin(angle_rad)
+        if angle == 0:
+            self.vx = 0
+            self.vy = -self.speed
+        else:
+            self.vx = self.speed * math.cos(angle_rad)
+            self.vy = self.speed * math.sin(angle_rad)
+
+            if self.vy > 0:
+                self.vy = -self.vy
+            
+            if self.vx > 0 and angle < 0:
+                self.vx = -self.vx
+
+        print(f'Angle: {angle} degrees, vx: {self.vx}, vy: {self.vy}')
+        print('-----------')
 
     def begin(self):
         self.vx = 0
