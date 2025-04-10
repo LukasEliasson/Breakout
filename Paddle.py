@@ -4,6 +4,7 @@ class Paddle:
         self.x = x
         self.y = y
         self.width = 50
+        self.base_width = 50
         self.height = 10
         self.color = "white"
 

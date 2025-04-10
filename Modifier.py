@@ -14,6 +14,7 @@ class Modifier:
         self.fall_speed = 2
         self.duration = None if duration is None else duration * 60
         self.activated_at = None
+        self.deactivated_at = None
         self.is_active = False
         self.brick = None
 
@@ -40,6 +41,9 @@ class Modifier:
     
     def set_activated_time(self, time: int) -> None:
         self.activated_at = time
+
+    def set_deactivated_time(self, time: int) -> None:
+        self.deactivated_at = time 
 
     def set_duration(self, duration: int) -> None:
         # Convert duration to ms

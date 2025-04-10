@@ -7,7 +7,7 @@ import random
 from copy import deepcopy
 
 class Main:
- 
+    
     def __init__(self):
 
         self.window_size = 500
@@ -37,6 +37,11 @@ class Main:
         self.modifiers.append(Modifier("Fast Ball", "negative", duration=5))
         self.modifiers.append(Modifier("Wide Paddle", "positive", duration=8))
         self.modifiers.append(Modifier("Extra Ball", "positive", duration=None))
+
+        pygame.mixer.init()
+        pygame.mixer.music.load('sfx/atari_st_beat.mp3')
+        pygame.mixer.music.set_volume(0.05)
+        pygame.mixer.music.play(-1, 0.0)
 
         self.update()
 
@@ -73,17 +78,42 @@ class Main:
             if modifier.duration and self.tick >= (modifier.activated_at + modifier.duration):
                 self.deactivate_modifier(modifier)
 
-        # Check ball collisions
+        if self.paddle.width > self.paddle.base_width:
+            self.paddle.width -= 1
+            self.paddle.x += 0.5
+
+            if self.paddle.width <= self.paddle.base_width:
+                self.paddle.width = self.paddle.base_width
+        
+        elif self.paddle.width < self.paddle.base_width:
+            self.paddle.width += 1
+            self.paddle.x -= 0.5
+
+            if self.paddle.width >= self.paddle.base_width:
+                self.paddle.width = self.paddle.base_width
+
         for ball in self.balls:
-            collision_object = ball.check_collision(self.paddle, self.bricks)
+
+            collision_object = ball.check_collision(self.paddle, self.bricks, self.balls)
 
             if collision_object:
                 if isinstance(collision_object, Paddle):
                     if ball.vy > 0 or ball.vx > 0:
                         ball.paddle_hit(45, self.paddle)
 
+                        paddle_hit_sound = pygame.mixer.Sound('sfx/paddle_hit.wav')
+                        paddle_hit_sound.play()
+
                 elif isinstance(collision_object, Brick):
                     self.handle_brick_collision(ball, collision_object)
+
+                elif isinstance(collision_object, Ball):
+                    pass
+                    #if self.tick - 60 >= ball.spawned_at:
+                    #    print(f'Ball collision: {self.tick - 60} > {ball.spawned_at}')
+                    #    # Bounce off the other ball, the other ball will also bounce off this ball when it gets to it in the loop.
+                    #    ball.bounce('xy')
+
 
         # If there are no dropped modifiers, randomly drop a modifier from the top
         if len(self.dropped_modifiers) == 0 and self.game_started:
@@ -100,6 +130,9 @@ class Main:
     def handle_brick_collision(self, ball: Ball, brick: Brick):
         brick.damage()
 
+        brick_hit_sound = pygame.mixer.Sound('sfx/brick_hit.wav')
+        brick_hit_sound.play()
+
         ball.bounce("y")
 
         if brick.is_destroyed():
@@ -110,9 +143,8 @@ class Main:
             if len(self.bricks) == 0:
                 self.win()
 
-
             random_num = random.randint(1, round(1 / self.modifier_drop_rate))
-            print(random_num)
+
             if random_num == 1:
                 modifier = deepcopy(random.choice(self.modifiers))
 
@@ -202,7 +234,7 @@ class Main:
             "y": self.paddle.y - ball_radius,
         }
 
-        self.balls.append(Ball(ball_starting_pos["x"], ball_starting_pos["y"], 0, 0, 5, "white"))
+        self.balls.append(Ball(ball_starting_pos["x"], ball_starting_pos["y"], 0, 0, 5, "white", self.tick))
 
     def activate_modifier(self, modifier: Modifier):
 
@@ -217,12 +249,11 @@ class Main:
                 for ball in self.balls:
                     ball.speed += 3
             case "Wide Paddle":
-                self.paddle.width += 50
-                self.paddle.x -= 25
+                self.paddle.base_width += 50
             case "Extra Ball":
-                self.balls.append(Ball(modifier.x, modifier.y, 0, -1, 5, "white"))
-                self.balls.append(Ball(modifier.x, modifier.y, 0.5, -0.5, 5, "white"))
-                self.balls.append(Ball(modifier.x, modifier.y, -0.5, -0.5, 5, "white"))
+                self.balls.append(Ball(modifier.x, modifier.y, 0, -1, 5, "white", self.tick))
+                self.balls.append(Ball(modifier.x, modifier.y, 0.5, -0.5, 5, "white", self.tick))
+                self.balls.append(Ball(modifier.x, modifier.y, -0.5, -0.5, 5, "white", self.tick))
 
         print(f'Activated modifier: {modifier.name}')
 
@@ -235,8 +266,7 @@ class Main:
                         ball.speed -= 3
             case "Wide Paddle":
                 print('Deactivated modifier: Wide Paddle')
-                self.paddle.width -= 50
-                self.paddle.x += 25
+                self.paddle.base_width -= 50
 
         self.active_modifiers.remove(modifier)
 
@@ -245,6 +275,7 @@ class Main:
         # Remove life and check for game win
         if restart_game:
             self.lost_game = False
+            self.won_game = False
             self.game_started = False
             self.score = 0
             self.lives = 3
@@ -262,6 +293,7 @@ class Main:
             self.deactivate_modifier(modifier)
 
         self.dropped_modifiers = []
+        self.balls = []
 
         # Regenerate objects
         self.generate_objects()
@@ -270,6 +302,8 @@ class Main:
         self.game_started = False
         
     def display_endscreen(self):
+        pygame.mixer.music.stop()
+
         self.canvas.fill('black')
         font = pygame.font.Font('freesansbold.ttf', 30)
         small_font = pygame.font.Font('freesansbold.ttf', 15)
