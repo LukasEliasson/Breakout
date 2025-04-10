@@ -27,6 +27,11 @@ class Main:
         self.active_modifiers = []
         self.modifier_drop_rate = 1  # 100% chance to drop a modifier each time a brick is destroyed
  
+    def start_music(self):
+        pygame.mixer.music.load('sfx/atari_st_beat.mp3')
+        pygame.mixer.music.set_volume(0.05)
+        pygame.mixer.music.play(-1, 0.0)
+
     # Will initialise the beginning of the game, create all essential objects etc.
     def setup(self):
 
@@ -39,9 +44,7 @@ class Main:
         self.modifiers.append(Modifier("Extra Ball", "positive", duration=None))
 
         pygame.mixer.init()
-        pygame.mixer.music.load('sfx/atari_st_beat.mp3')
-        pygame.mixer.music.set_volume(0.05)
-        pygame.mixer.music.play(-1, 0.0)
+        self.start_music()
 
         self.update()
 
@@ -280,6 +283,8 @@ class Main:
             self.score = 0
             self.lives = 3
             self.tick = 0
+
+            self.start_music()
 
             self.generate_bricks()
 
