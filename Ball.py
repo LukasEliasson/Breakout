@@ -1,6 +1,5 @@
 import math
-import pygame
-from pygame import Vector2
+from pygame import Vector2, mixer
 from Paddle import Paddle
 from Brick import Brick
 
@@ -55,7 +54,7 @@ class Ball:
         ball_top_edge = self.y - self.radius
         ball_bottom_edge = self.y + self.radius
 
-        wall_hit_sound = pygame.mixer.Sound('sfx/wall_hit.wav')
+        wall_hit_sound = mixer.Sound('sfx/wall_hit.wav')
 
         if (ball_left_edge <= 0 or ball_right_edge >= window_size) and (self.y > window_size):
             self.bounce('xy')
