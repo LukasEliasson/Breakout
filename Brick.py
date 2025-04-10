@@ -1,6 +1,6 @@
 class Brick:
 
-    def __init__(self, x, y, color, width=20, height=5, durability=1):
+    def __init__(self, x, y, color, width=437/22, height=7, durability=1):
         self.x = x
         self.y = y
         self.width = width
