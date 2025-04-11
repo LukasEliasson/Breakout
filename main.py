@@ -5,6 +5,8 @@ from Ball import Ball
 from Modifier import Modifier
 import random
 from copy import deepcopy
+from time import time
+from datetime import timedelta
 
 class Main:
     
@@ -26,6 +28,12 @@ class Main:
         self.dropped_modifiers = []
         self.active_modifiers = []
         self.modifier_drop_rate = 1  # 100% chance to drop a modifier each time a brick is destroyed
+        self.death_disabled = False
+        self.start_time = 0
+        self.game_time = 0
+        self.elapsed_time = self.start_time - self.game_time
+        self.max_points = 100000
+        self.max_time = 120
  
     def start_music(self):
         pygame.mixer.music.load('sfx/atari_st_beat.mp3')
@@ -42,6 +50,7 @@ class Main:
         self.modifiers.append(Modifier("Fast Ball", "negative", duration=5))
         self.modifiers.append(Modifier("Wide Paddle", "positive", duration=8))
         self.modifiers.append(Modifier("Extra Ball", "positive", duration=None))
+        self.modifiers.append(Modifier("Extravaganza", "special", duration=5))
 
         pygame.mixer.init()
         self.start_music()
@@ -140,7 +149,6 @@ class Main:
 
         if brick.is_destroyed():
 
-            self.score += 1
             self.bricks.remove(brick)
 
             if len(self.bricks) == 0:
@@ -157,16 +165,37 @@ class Main:
                     print(f'Dropped modifier: {modifier.name}')
                     self.dropped_modifiers.append(modifier)
 
+    def calculate_score(self):
+        return round(self.max_points * (1 - (self.elapsed_time / self.max_time)))
+
     def draw(self):
         for brick in self.bricks:
             pygame.draw.rect(self.canvas, brick.color, pygame.Rect(brick.x, brick.y, brick.width, brick.height))
 
         # Info text
         font = pygame.font.Font('freesansbold.ttf', 12)
-        text = font.render(f'Lives: {self.lives}. Score: {self.score}', True, "white")
+        text = font.render(f'Lives: {self.lives}', True, "white")
         text_rect = text.get_rect()
-        text_rect.center = (55, 10)
+        text_rect.center = (30, 10)
         self.canvas.blit(text, text_rect)
+
+        if self.game_started:
+            self.game_time = round(time())
+        else:
+            self.game_time = self.start_time + self.elapsed_time
+
+        self.elapsed_time = self.game_time - self.start_time
+        formatted_time = str(timedelta(seconds=self.elapsed_time)).removeprefix('0:')
+        timer = font.render(f'{formatted_time}', True, "white")
+        timer_rect = timer.get_rect()
+        timer_rect.center = (self.window_size - 25, 10)
+        self.canvas.blit(timer, timer_rect)
+
+        self.score = self.calculate_score()
+        score_text = font.render(str(self.score), True, "white")
+        score_rect = score_text.get_rect()
+        score_rect.center = (self.window_size / 2, 10)
+        self.canvas.blit(score_text, score_rect)
 
         pygame.draw.rect(self.canvas, "white", pygame.Rect(self.paddle.x, self.paddle.y, self.paddle.width, self.paddle.height))
 
@@ -183,11 +212,9 @@ class Main:
         colors = ["red", "red", "orange", "orange", "green", "green", "yellow", "yellow"]
 
         for x in range(0, self.window_size, 22):
-            for y in range(10, 90, 10):
+            for y in range(20, 90, 10):
                 color_index = int(y / 10 - 1)
-                print(color_index)
                 color = colors[color_index]
-                print(color)
                 self.bricks.append(Brick(x, y, color))
 
     def main(self):
@@ -257,21 +284,46 @@ class Main:
                 self.balls.append(Ball(modifier.x, modifier.y, 0, -1, 5, "white", self.tick))
                 self.balls.append(Ball(modifier.x, modifier.y, 0.5, -0.5, 5, "white", self.tick))
                 self.balls.append(Ball(modifier.x, modifier.y, -0.5, -0.5, 5, "white", self.tick))
+            case "Extravaganza":
+                self.balls.append(Ball(modifier.x, modifier.y, 0, -1, 5, "white", self.tick))
+                self.balls.append(Ball(modifier.x, modifier.y, 0.5, -0.5, 5, "white", self.tick))
+                self.balls.append(Ball(modifier.x, modifier.y, -0.5, -0.5, 5, "white", self.tick))
+                self.balls.append(Ball(modifier.x, modifier.y, -0.25, -0.75, 5, "white", self.tick))
+                self.balls.append(Ball(modifier.x, modifier.y, 0.25, -0.75, 5, "white", self.tick))
+
+                for ball in self.balls:
+                    ball.speed += 15
+                    ball.death_disabled = True
+                
+                modifier.set_activated_time(self.tick)
 
         print(f'Activated modifier: {modifier.name}')
 
     def deactivate_modifier(self, modifier: Modifier):
         match modifier.name:
             case "Fast Ball":
-                print('Deactivated modifier: Fast Ball')
                 for ball in self.balls:
                     if ball.speed >= 8:
                         ball.speed -= 3
             case "Wide Paddle":
-                print('Deactivated modifier: Wide Paddle')
                 self.paddle.base_width -= 50
+            case "Extravaganza":
+                extravaganza_count = 0
+                
+                for modifier in self.active_modifiers:
+                    if modifier.name == "Extravaganza":
+                        extravaganza_count += 1
+
+                for ball in self.balls:
+                    if extravaganza_count <= 1:
+                        ball.death_disabled = False
+                    
+                    if ball.speed >= 20:
+                        ball.speed -= 15
 
         self.active_modifiers.remove(modifier)
+
+        print(f'Deactivated modifier: {modifier.name}')
 
     def reset(self, restart_game=False):
 
@@ -360,6 +412,9 @@ class Main:
             if not self.game_started:
                 self.balls[0].begin()
                 self.game_started = True
+                if self.lives == 3:
+                    self.start_time = round(time())
+                    self.game_time = self.start_time
 
         if keysPressed[pygame.K_SPACE]:
             self.reset(restart_game=True)

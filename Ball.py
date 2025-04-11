@@ -16,6 +16,7 @@ class Ball:
         self.speed = 5
         self.is_dead = False
         self.spawned_at = spawned_at
+        self.death_disabled = False
 
     def move(self) -> None:
         self.x += self.speed * self.vx
@@ -65,7 +66,10 @@ class Ball:
         elif ball_top_edge <= 0:
             self.bounce('y')
             wall_hit_sound.play()
-        elif ball_top_edge >= window_size:
+        elif ball_bottom_edge >= window_size and self.death_disabled:
+            self.bounce('y')
+            wall_hit_sound.play()
+        elif ball_top_edge >= window_size and not self.death_disabled:
             self.is_dead = True
 
         # Check if the ball has escaped the screen
