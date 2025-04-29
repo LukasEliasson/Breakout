@@ -5,7 +5,7 @@ from Brick import Brick
 
 class Ball:
 
-    def __init__(self, x: int, y: int, vx: int, vy: int, radius: int, color: str, spawned_at: int):
+    def __init__(self, x: int, y: int, vx: int, vy: int, radius: int, color: str, speed=300):
         self.x = x
         self.y = y
         self.pos = Vector2(self.x, self.y)
@@ -13,14 +13,13 @@ class Ball:
         self.vy = vy
         self.radius = radius
         self.color = color
-        self.speed = 5
+        self.speed = speed
         self.is_dead = False
-        self.spawned_at = spawned_at
         self.death_disabled = False
 
-    def move(self) -> None:
-        self.x += self.speed * self.vx
-        self.y += self.speed * self.vy
+    def move(self, dt: int) -> None:
+        self.x += self.speed * self.vx * dt
+        self.y += self.speed * self.vy * dt
         self.pos = Vector2(self.x, self.y)
 
     def check_collision(self, paddle: Paddle, bricks: list[Brick], balls: list) -> Paddle | Brick | None:
@@ -98,6 +97,6 @@ class Ball:
             if self.vx > 0 and angle < 0:
                 self.vx = -self.vx
 
-    def begin(self):
+    def begin(self) -> None:
         self.vx = 0
         self.vy = -1

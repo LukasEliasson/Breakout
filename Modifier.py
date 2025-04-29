@@ -1,9 +1,11 @@
+from GameManager import GameManager
+from Ball import Ball
 from Brick import Brick
 from Paddle import Paddle
 
 class Modifier:
 
-    def __init__(self, name: str, type: str, ball_speed: int=5, paddle_size: int=50, duration: int=None):
+    def __init__(self, name: str, type: str, ball_speed: int=5, paddle_size: int=50, time_remaining: int=None):
         self.x = 0
         self.y = 0
         self.name = name
@@ -12,7 +14,7 @@ class Modifier:
         self.radius = 5
         self.color = "green" if type == "positive" else "red" if type == "negative" else "yellow" if type == "special" else "grey"
         self.fall_speed = 2
-        self.duration = None if duration is None else duration * 60
+        self.time_remaining = time_remaining
         self.activated_at = None
         self.deactivated_at = None
         self.is_active = False
@@ -50,3 +52,75 @@ class Modifier:
         duration *= 1000
 
         self.duration = duration
+
+    def activate(self, game_manager: GameManager) -> None:
+        if self.time_remaining:
+            game_manager.active_modifiers.append(self)
+        game_manager.dropped_modifiers.remove(self)
+
+        self.set_activated_time(game_manager.tick)
+
+        match self.name:
+            case "Fast Ball":
+                for ball in game_manager.balls:
+                    ball.speed += 150
+            case "Wide Paddle":
+                game_manager.paddle.base_width += 50
+            case "Extra Ball":
+                # New balls will have the same speed as the first ball
+                ball_speed = game_manager.balls[0].speed
+                game_manager.balls.append(Ball(self.x, self.y, 0, -1, 5, "white", speed=ball_speed))
+                game_manager.balls.append(Ball(self.x, self.y, 0.5, -0.5, 5, "white", speed=ball_speed))
+                game_manager.balls.append(Ball(self.x, self.y, -0.5, -0.5, 5, "white", speed=ball_speed))
+            case "Extravaganza":
+                # New balls will have the same speed as the first ball
+                ball_speed = game_manager.balls[0].speed
+                game_manager.balls.append(Ball(self.x, self.y, 0, -1, 5, "white", speed=ball_speed))
+                game_manager.balls.append(Ball(self.x, self.y, 0.5, -0.5, 5, "white", speed=ball_speed))
+                game_manager.balls.append(Ball(self.x, self.y, -0.5, -0.5, 5, "white", speed=ball_speed))
+                game_manager.balls.append(Ball(self.x, self.y, -0.25, -0.75, 5, "white", speed=ball_speed))
+                game_manager.balls.append(Ball(self.x, self.y, 0.25, -0.75, 5, "white", speed=ball_speed))
+
+                for ball in game_manager.balls:
+                    ball.speed += 1000
+                    ball.death_disabled = True
+                
+                self.set_activated_time(game_manager.tick)
+
+            case "Extra Brick Row":
+                # Move all bricks down 1 row (10 pixels)
+                for brick in game_manager.bricks:
+                    brick.y += 10
+
+                # Create a new row of bricks at the top of the screen
+                for i in range(0, game_manager.WINDOW_SIZE, 22):
+                    game_manager.bricks.append(Brick(i, 20, "grey"))
+
+        print(f'Activated self: {self.name}')
+
+    def deactivate(self, game_manager: GameManager) -> None:
+        match self.name:
+            case "Fast Ball":
+                for ball in game_manager.balls:
+                    if ball.speed >= 450:
+                        ball.speed -= 150
+            case "Wide Paddle":
+                game_manager.paddle.base_width -= 50
+            case "Extravaganza":
+                extravaganza_count = 0
+                
+                for mod in game_manager.active_modifiers:
+                    if mod.name == "Extravaganza":
+                        extravaganza_count += 1
+
+                for ball in game_manager.balls:
+                    if extravaganza_count <= 1:
+                        ball.death_disabled = False
+                    
+                    if ball.speed >= 300 + 1000 * extravaganza_count:
+                        ball.speed -= 1000
+
+        if self in game_manager.active_modifiers:
+            game_manager.active_modifiers.remove(self)
+
+        print(f'Deactivated modifier: {self.name}')

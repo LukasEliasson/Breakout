@@ -14,8 +14,8 @@ class Paddle:
     def __repr__(self):
         return f'Paddle({self.x}, {self.y})'
 
-    def move(self, direction):
+    def move(self, direction, dt: int) -> None:
         if direction == "left":
-            self.x -= 5
+            self.x -= 300 * dt
         if direction == "right":
-            self.x += 5
+            self.x += 300 * dt
