@@ -91,7 +91,7 @@ class Main:
  
         # CREATE A self.canvas
         self.canvas = pygame.display.set_mode((self.window_size, self.window_size))
- 
+
         # TITLE OF self.canvas
         pygame.display.set_caption("Breakout")
  
@@ -136,7 +136,7 @@ class Main:
         text_rect = None
 
         if self.game_manager.lost_game:
-            text = font.render(f'Game Over. Score: {self.game_manager.score}', True, 'red')
+            text = font.render(f'Game Over.', True, 'red')
         else:
             text = font.render(f'You win! Score: {self.game_manager.score}', True, 'green')
 

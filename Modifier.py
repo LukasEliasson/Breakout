@@ -2,6 +2,7 @@ from GameManager import GameManager
 from Ball import Ball
 from Brick import Brick
 from Paddle import Paddle
+import random
 
 class Modifier:
 
@@ -12,7 +13,11 @@ class Modifier:
         self.type = type
         self.powerup = None
         self.radius = 5
-        self.color = "green" if type == "positive" else "red" if type == "negative" else "yellow" if type == "special" else "grey"
+        
+        #self.color = "green" if type == "positive" else "red" if type == "negative" else "yellow" if type == "special" else "grey"
+        colors = ["green", "red", "yellow", "blue", "purple"]
+        self.color = random.choice(colors)
+
         self.fall_speed = 2
         self.time_remaining = time_remaining
         self.activated_at = None

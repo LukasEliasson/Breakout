@@ -100,7 +100,6 @@ class GameManager:
                 elif isinstance(collision_object, Brick):
                     self.handle_brick_collision(ball, collision_object)
 
-
         # If there are no dropped modifiers, randomly drop a modifier from the top
         if len(self.dropped_modifiers) == 0 and self.game_started:
             random_num = random.randint(1, 500)
@@ -118,8 +117,9 @@ class GameManager:
         self.score = self.calculate_score()
     
     def calculate_score(self):
-        return round(self.MAX_POINTS * (1 - (self.elapsed_time / self.MAX_TIME)))
-
+        score = round(self.MAX_POINTS * (1 - (self.elapsed_time / self.MAX_TIME)))
+        return max(0, score)
+    
     def handle_brick_collision(self, ball: Ball, brick: Brick):
         brick.damage()
 
