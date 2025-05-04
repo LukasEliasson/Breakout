@@ -7,6 +7,11 @@ from Modifier import Modifier
 from datetime import timedelta
 from collections import defaultdict
 import math
+from pathlib import Path
+import json
+
+# Get highscores.json file path.
+HIGHSCORES_PATH = Path(__file__).resolve().parent / "highscores.json"
 
 class Main:
     
@@ -38,28 +43,42 @@ class Main:
     def draw(self):
         self.canvas.fill((0, 0, 0))
 
-        for brick in self.game_manager.bricks:
-            pygame.draw.rect(self.canvas, brick.color, pygame.Rect(brick.x, brick.y, brick.width, brick.height))
+        # Draw game elements (Bricks, paddle, balls, etc.)
+        self.draw_game_elements()
 
-        # Info text
+        # Draw UI text at the top of the screen
+        self.draw_ui()
+
+        # Draw modifier information
+        self.draw_modifier_info()
+
+        pygame.display.flip()
+
+    def draw_ui(self):
         font = pygame.font.Font('freesansbold.ttf', 12)
-        text = font.render(f'Lives: {self.game_manager.lives}', True, "white")
-        text_rect = text.get_rect()
-        text_rect.center = (30, 10)
-        self.canvas.blit(text, text_rect)
 
+        # Draw lives info
+        lives = font.render(f'Level: {self.game_manager.level_manager.current_level}                  Lives: {self.game_manager.lives}', True, "white")
+        lives_rect = lives.get_rect()
+        lives_rect.topleft = (5, 4)
+        self.canvas.blit(lives, lives_rect)
+
+        # Draw timer
         formatted_time = str(timedelta(seconds=math.floor(self.game_manager.elapsed_time))).removeprefix('0:')
         timer = font.render(f'{formatted_time}', True, "white")
         timer_rect = timer.get_rect()
         timer_rect.center = (self.window_size - 25, 10)
         self.canvas.blit(timer, timer_rect)
 
-        score_text = font.render(str(self.game_manager.score), True, "white")
+        # Draw score info
+        score_text = font.render(str(self.game_manager.level_points + self.game_manager.total_points), True, "white")
         score_rect = score_text.get_rect()
         score_rect.center = (self.window_size / 2, 10)
         self.canvas.blit(score_text, score_rect)
 
-        # Modifier info
+    def draw_modifier_info(self):
+        font = pygame.font.Font('freesansbold.ttf', 12)
+
         modifier_counts = defaultdict(list)
         for modifier in self.game_manager.active_modifiers:
             modifier_counts[modifier.name].append(modifier)
@@ -74,15 +93,43 @@ class Main:
             modifier_rect.bottomleft = (10, 150 + i * 15)
             self.canvas.blit(modifier_text, modifier_rect)
 
-        pygame.draw.rect(self.canvas, "white", pygame.Rect(self.game_manager.paddle.x, self.game_manager.paddle.y, self.game_manager.paddle.width, self.game_manager.paddle.height))
+    def draw_game_elements(self):
 
+        # Draw bricks
+        self.draw_bricks()
+
+        # Draw paddle
+        self.draw_paddle()
+
+        # Draw balls
+        self.draw_balls()
+
+        # Draw dropped modifiers
+        self.draw_dropped_modifiers()
+
+    def draw_bricks(self):
+        for brick in self.game_manager.bricks:
+            # Create a brick with transparency based on durability
+            surface = pygame.Surface((brick.width, brick.height))
+            surface.fill(brick.color)
+            surface.set_alpha(255 * ((brick.durability - brick.hits) / brick.durability))
+            self.canvas.blit(surface, (brick.x, brick.y))
+
+    def draw_paddle(self):
+        pygame.draw.rect(self.canvas, "white", pygame.Rect(
+            self.game_manager.paddle.x,
+            self.game_manager.paddle.y,
+            self.game_manager.paddle.width,
+            self.game_manager.paddle.height
+        ))
+
+    def draw_balls(self):
         for ball in self.game_manager.balls:
             pygame.draw.circle(self.canvas, "white", ball.pos, ball.radius)
-        
+
+    def draw_dropped_modifiers(self):
         for modifier in self.game_manager.dropped_modifiers:
             pygame.draw.circle(self.canvas, modifier.color, (modifier.x, modifier.y), modifier.radius)
-
-        pygame.display.flip()
 
     def main(self):
  
@@ -94,13 +141,17 @@ class Main:
 
         # TITLE OF self.canvas
         pygame.display.set_caption("Breakout")
+        pygame.display.set_icon(pygame.image.load('assets/apple_man.jpg'))
  
         # SETUP GAME OBJECTS
         self.setup()
  
         # GAME LOOP
         while not self.exit:
-            if self.game_manager.lost_game or self.game_manager.won_game:
+            if self.game_manager.lost_game:
+                if not self.game_manager.name_entered:
+                    self.handle_endgame()
+                    continue
                 self.display_endscreen()
                 self.handle_events()
                 continue
@@ -114,6 +165,14 @@ class Main:
             
             if self.game_manager.game_started:
                 self.game_manager.tick += 1
+                
+    def get_highscores(self):
+        with open(HIGHSCORES_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+
+    def save_highscores(self, highscores):
+        with open(HIGHSCORES_PATH, 'w', encoding='utf-8') as f:
+            json.dump(highscores, f, ensure_ascii=False, indent=4)
 
     # Runs every frame. What will happen each frame
     def handle_events(self):
@@ -124,22 +183,28 @@ class Main:
         keys = pygame.key.get_pressed()
  
         self.react_to_user_input(keys)
-        
+
+    def handle_endgame(self):
+        highscores = self.get_highscores()
+
+        is_highscore = len(highscores) < 5 or self.game_manager.total_points > min(highscores.values())
+
+        if is_highscore:
+            player_name = self.get_name()
+            highscores[player_name] = self.game_manager.total_points
+            sorted_highscores = dict(sorted(highscores.items(), key=lambda i: i[1], reverse=True)[:5])
+            self.save_highscores(sorted_highscores)
+            
+        self.game_manager.name_entered = True
+
     def display_endscreen(self):
-        pygame.mixer.music.stop()
+        self.game_manager.sound_manager.stop_music()
 
         self.canvas.fill('black')
         font = pygame.font.Font('freesansbold.ttf', 30)
         small_font = pygame.font.Font('freesansbold.ttf', 15)
 
-        text = None
-        text_rect = None
-
-        if self.game_manager.lost_game:
-            text = font.render(f'Game Over.', True, 'red')
-        else:
-            text = font.render(f'You win! Score: {self.game_manager.score}', True, 'green')
-
+        text = font.render(f'Game Over. Score: {self.game_manager.total_points}', True, 'red')
         text_rect = text.get_rect()
         text_rect.center = (self.window_size / 2, self.window_size / 2)
 
@@ -149,8 +214,56 @@ class Main:
 
         self.canvas.blit(text, text_rect)
         self.canvas.blit(restart_text, restart_text_rect)
+
+        # Show highscores
+        highscores = self.get_highscores()
+        sorted_highscores = sorted(highscores.items(), key=lambda i: i[1], reverse=True)
+        highscore_text = small_font.render('Highscores:', True, 'white')
+        highscore_text_rect = highscore_text.get_rect()
+        highscore_text_rect.center = (self.window_size / 2, self.window_size / 2 + 70)
+
+        self.canvas.blit(highscore_text, highscore_text_rect)
+
+        for i, (name, score) in enumerate(sorted_highscores):
+            score_text = small_font.render(f'{i+1}. {name}: {score}', True, 'white')
+            score_text_rect = score_text.get_rect()
+            score_text_rect.center = (self.window_size / 2, self.window_size / 2 + 90 + i * 20)
+            self.canvas.blit(score_text, score_text_rect)
+
         pygame.display.flip()
  
+    def get_name(self):
+        name = ''
+        active = True
+        font = pygame.font.Font('freesansbold.ttf', 20)
+
+        while active:
+            self.canvas.fill('black')
+            prompt = font.render('New Highscore! Enter your name:', True, 'white')
+            prompt_rect = prompt.get_rect()
+            prompt_rect.center = (self.window_size / 2, self.window_size / 2 - 20)
+            name_surface = font.render(name + '|', True, 'white')
+            name_surface_rect = name_surface.get_rect()
+            name_surface_rect.center = (self.window_size / 2, self.window_size / 2)
+            self.canvas.blit(prompt, prompt_rect)
+            self.canvas.blit(name_surface, name_surface_rect)
+            pygame.display.flip()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.exit = True
+                    active = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_BACKSPACE:
+                        name = name[:-1]
+                    elif event.key == pygame.K_RETURN:
+                        if len(name) > 0:
+                            active = False
+                    else:
+                        if len(name) < 10:
+                            name += event.unicode
+        return name
+
     def react_to_user_input(self, keysPressed):
         paddle_left_edge = self.game_manager.paddle.x
         paddle_right_edge = self.game_manager.paddle.x + self.game_manager.paddle.width

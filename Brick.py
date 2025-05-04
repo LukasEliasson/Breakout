@@ -7,6 +7,7 @@ class Brick:
         self.height = height
         self.color = color
         self.durability = durability
+        self.hits = 0
 
     def __str__(self):
         return "Brick at x: " + str(self.x) + " y: " + str(self.y)
@@ -15,7 +16,7 @@ class Brick:
         return f'Brick({self.x}, {self.y}, {self.color}, {self.width}, {self.height})'
     
     def damage(self):
-        self.durability -= 1
+        self.hits += 1
 
     def is_destroyed(self):
-        return self.durability <= 0
+        return self.hits >= self.durability

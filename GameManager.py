@@ -1,5 +1,6 @@
 import pygame
 from SoundManager import SoundManager
+from LevelManager import LevelManager
 from Brick import Brick
 from Paddle import Paddle
 from Ball import Ball
@@ -11,15 +12,13 @@ class GameManager:
     def __init__(self, modifiers, WINDOW_SIZE):
         
         self.MAX_POINTS = 100000
-        self.MAX_TIME = 120
-        self.MAX_BALL_SPEED = 2300
+        self.MAX_BALL_SPEED = 1500
         self.WINDOW_SIZE = WINDOW_SIZE
 
         self.dt = 0   # Updated from the main loop
-        self.paddle, self.balls = self.generate_objects()
-        self.bricks = self.generate_bricks()
         self.modifiers = modifiers
-        self.score = self.MAX_POINTS
+        self.level_points = self.MAX_POINTS
+        self.total_points = 0
         self.lives = 3
         self.game_started = False
         self.won_game = False
@@ -27,51 +26,103 @@ class GameManager:
         self.tick = 0
         self.dropped_modifiers = []
         self.active_modifiers = []
-        self.modifier_drop_rate = 1  # 100% chance to drop a modifier each time a brick is destroyed
+        self.modifier_drop_rate = 0.2  # 20% chance to drop a modifier each time a brick is destroyed
         self.death_disabled = False
         self.elapsed_time = 0
+        self.name_entered = False
 
         self.sound_manager = SoundManager()
-
+        self.level_manager = LevelManager()
+        
+        self.paddle, self.balls = self.generate_objects()
+        self.bricks = self.generate_bricks()
 
     # Will update every frame
     def update(self):
 
+        # Start music if not already playing and game has started.
         if not self.sound_manager.playing_music and self.game_started:
             self.sound_manager.start_music()
 
-        if self.balls[0].vy != 0:
+        # Increase elapsed time. The first ball is used to check if the game has started.
+        if self.game_started:
             self.elapsed_time += self.dt
 
+        # Update position of balls
+        self.update_balls()
+
+        # Handle dropped modifiers
+        self.update_dropped_modifiers()
+
+        # Handle active modifiers
+        self.update_active_modifiers()
+
+        # Update paddle width if it is shrinking or growing
+        self.update_paddle_width()
+
+        # Handle ball collisions
+        self.handle_ball_collisions()
+
+        # If there are no dropped modifiers, randomly drop a modifier from the top
+        if len(self.dropped_modifiers) == 0 and self.game_started:
+            random_num = random.randint(1, 500)
+            if random_num == 1:
+                self.drop_random_modifier()
+
+        # Cap ball speed
         for ball in self.balls:
+            ball.speed = min(ball.speed, self.MAX_BALL_SPEED)
+
+        self.level_points = self.calculate_score()
+
+    def update_balls(self):
+
+        # A copy of self.balls is used (by adding [:] at the end) to avoid modifying the list while iterating over it
+        for ball in self.balls[:]:
+
+            # Update ball position
             ball.move(self.dt)
 
-            if not ball.is_dead:
-                ball.handle_edge_bounce(self.WINDOW_SIZE)
-            else:
+            if ball.is_dead:
+                # If the ball is dead, remove it from the game
                 self.balls.remove(ball)
+
+                # If all balls are dead, reset the game
                 if len(self.balls) <= 0:
                     self.reset()
 
-        # Handle dropped modifiers
+            else:
+                # Handle collisions with edges
+                ball.handle_edge_bounce(self.WINDOW_SIZE)     
+
+    def update_dropped_modifiers(self):
+        # A copy of self.dropped_modifiers is used (by adding [:] at the end) to avoid modifying the list while iterating over it
         for modifier in self.dropped_modifiers[:]:
 
+            # Update modifier position
             modifier.fall()
             
+            # If the modifier is out of bounds, remove it from the game
             if modifier.is_out_of_bounds(self.WINDOW_SIZE):
                 self.dropped_modifiers.remove(modifier)
 
+            # If the modifier is caught by the paddle, activate it
             elif modifier.is_caught(self.paddle):
                 modifier.activate(self)
 
-        # Handle active modifiers
+    def update_active_modifiers(self):
+        # A copy of self.active_modifiers is used (by adding [:] at the end) to avoid modifying the list while iterating over it
         for modifier in self.active_modifiers[:]:
+
+            # If the time remaining of the modifier is less than or equal to 0, deactivate it
             if modifier.time_remaining <= 0:
                 modifier.deactivate(self)
-            elif modifier.time_remaining > 0:
+
+            # If the modifier is still active, update its time remaining
+            else:
                 modifier.time_remaining -= self.dt
 
-
+    def update_paddle_width(self):
         if self.paddle.width > self.paddle.base_width:
             self.paddle.width -= 1
             self.paddle.x += 0.5
@@ -86,6 +137,7 @@ class GameManager:
             if self.paddle.width >= self.paddle.base_width:
                 self.paddle.width = self.paddle.base_width
 
+    def handle_ball_collisions(self):
         for ball in self.balls:
 
             collision_object = ball.check_collision(self.paddle, self.bricks, self.balls)
@@ -100,24 +152,17 @@ class GameManager:
                 elif isinstance(collision_object, Brick):
                     self.handle_brick_collision(ball, collision_object)
 
-        # If there are no dropped modifiers, randomly drop a modifier from the top
-        if len(self.dropped_modifiers) == 0 and self.game_started:
-            random_num = random.randint(1, 500)
-            if random_num == 1:
-                modifier = deepcopy(random.choice(self.modifiers))
-                modifier.x = random.randint(0 + modifier.radius * 2, self.WINDOW_SIZE - modifier.radius * 2)
-                modifier.y = 0 + modifier.radius
-                print(f'Dropped modifier: {modifier.name}')
-                self.dropped_modifiers.append(modifier)
+    def drop_random_modifier(self):
+        modifier = deepcopy(random.choice(self.modifiers))
+        modifier.x = random.randint(0 + modifier.radius * 2, self.WINDOW_SIZE - modifier.radius * 2)
+        modifier.y = 0 + modifier.radius
+        print(f'Dropped modifier: {modifier.name}')
+        self.dropped_modifiers.append(modifier)
 
-        # Cap ball speed
-        for ball in self.balls:
-            ball.speed = min(ball.speed, self.MAX_BALL_SPEED)
-
-        self.score = self.calculate_score()
-    
     def calculate_score(self):
-        score = round(self.MAX_POINTS * (1 - (self.elapsed_time / self.MAX_TIME)))
+        # Calculate score based on elapsed time, maximum time, and maximum points
+        # The score decreases as time elapsed increases
+        score = round(self.MAX_POINTS * (1 - (self.elapsed_time / self.level_manager.max_time)))
         return max(0, score)
     
     def handle_brick_collision(self, ball: Ball, brick: Brick):
@@ -145,35 +190,45 @@ class GameManager:
                     print(f'Dropped modifier: {modifier.name}')
                     self.dropped_modifiers.append(modifier)
     
-    def reset(self, restart_game=False):
+    def reset(self, new_level: bool = False, restart_game: bool = False) -> None:
 
-        # Remove life and check for game win
-        if restart_game:
-            self.lost_game = False
-            self.won_game = False
+        # Reset game state depending on if the game is restarting or a new level is starting
+        if restart_game or new_level:
+
+            # Reset game state
+            if restart_game:
+                self.lost_game = False
+                self.won_game = False
+                self.lives = 3
+                self.tick = 0
+                self.elapsed_time = 0
+
+            # Reset level state
             self.game_started = False
-            self.score = 0
-            self.lives = 3
-            self.tick = 0
-            self.elapsed_time = 0
+            self.name_entered = False
 
+            # Start music again
             self.sound_manager.start_music()
 
-            self.bricks = self.generate_bricks()
-
         else:
+            # Remove one life and check for game over
             self.lives -= 1
             if self.lives <= 0:
                 self.lose()
+                return
 
         # Deactivate and remove all modifiers
         for modifier in self.active_modifiers[:]:
             modifier.deactivate(self)
-
+            
         self.dropped_modifiers = []
-
+        
         # Regenerate objects
         self.paddle, self.balls = self.generate_objects()
+
+        # If the game is restarting or there is a new level, regenerate bricks
+        if restart_game or new_level:
+            self.bricks = self.generate_bricks()
 
         # Reset game state
         self.game_started = False
@@ -187,7 +242,7 @@ class GameManager:
             "y": paddle.y - ball_radius,
         }
 
-        balls = [Ball(ball_starting_pos["x"], ball_starting_pos["y"], 0, 0, 5, "white")]
+        balls = [Ball(ball_starting_pos["x"], ball_starting_pos["y"], 0, 0, 5, "white", speed=self.level_manager.ball_speed)]
 
         return paddle, balls
     
@@ -199,14 +254,17 @@ class GameManager:
             for y in range(20, 90, 10):
                 color_index = int(y / 10 - 1)
                 color = colors[color_index]
-                bricks.append(Brick(x, y, color))
+                bricks.append(Brick(x, y, color, durability=1*self.level_manager.hit_multiplier))
 
         return bricks
 
     def win(self):
         self.game_started = False
         self.won_game = True
+        self.total_points += self.level_points
+        self.level_manager.increase_level()
         self.sound_manager.stop_music()
+        self.reset(new_level=True)
 
     def lose(self):
         self.game_started = False
