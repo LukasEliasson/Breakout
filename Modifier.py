@@ -34,7 +34,7 @@ class Modifier:
         colors = ["green", "red", "yellow", "blue", "purple"]
         self.color = random.choice(colors)
 
-        self.fall_speed = 2
+        self.fall_speed = 120
         self.time_remaining = time_remaining
         self.activated_at = None
         self.deactivated_at = None
@@ -102,8 +102,8 @@ class Modifier:
     ------
     None
     """
-    def fall(self) -> None:
-        self.y += self.fall_speed
+    def fall(self, dt) -> None:
+        self.y += self.fall_speed * dt
 
     """
     Checks if the modifier is caught by the paddle.

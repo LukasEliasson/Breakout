@@ -15,7 +15,7 @@ class GameManager:
         self.MAX_BALL_SPEED = 1500
         self.WINDOW_SIZE = WINDOW_SIZE
 
-        self.dt = 0   # Updated from the main loop
+        self.dt = 0.02   # Updated from the main loop
         self.modifiers = modifiers
         self.level_points = self.MAX_POINTS
         self.total_points = 0
@@ -47,6 +47,7 @@ class GameManager:
         # Increase elapsed time. The first ball is used to check if the game has started.
         if self.game_started:
             self.elapsed_time += self.dt
+            self.level_manager.time_spent += self.dt
 
         # Update position of balls
         self.update_balls()
@@ -100,7 +101,7 @@ class GameManager:
         for modifier in self.dropped_modifiers[:]:
 
             # Update modifier position
-            modifier.fall()
+            modifier.fall(self.dt)
             
             # If the modifier is out of bounds, remove it from the game
             if modifier.is_out_of_bounds(self.WINDOW_SIZE):
@@ -124,15 +125,15 @@ class GameManager:
 
     def update_paddle_width(self):
         if self.paddle.width > self.paddle.base_width:
-            self.paddle.width -= 1
-            self.paddle.x += 0.5
+            self.paddle.width -= 60 * self.dt
+            self.paddle.x += 30 * self.dt
 
             if self.paddle.width <= self.paddle.base_width:
                 self.paddle.width = self.paddle.base_width
         
         elif self.paddle.width < self.paddle.base_width:
-            self.paddle.width += 1
-            self.paddle.x -= 0.5
+            self.paddle.width += 60 * self.dt
+            self.paddle.x -= 30 * self.dt
 
             if self.paddle.width >= self.paddle.base_width:
                 self.paddle.width = self.paddle.base_width
@@ -162,7 +163,7 @@ class GameManager:
     def calculate_score(self):
         # Calculate score based on elapsed time, maximum time, and maximum points
         # The score decreases as time elapsed increases
-        score = round(self.MAX_POINTS * (1 - (self.elapsed_time / self.level_manager.max_time)))
+        score = round(self.MAX_POINTS * (1 - (self.level_manager.time_spent / self.level_manager.max_time)))
         return max(0, score)
     
     def handle_brick_collision(self, ball: Ball, brick: Brick):
@@ -202,6 +203,8 @@ class GameManager:
                 self.lives = 3
                 self.tick = 0
                 self.elapsed_time = 0
+                self.level_manager.reset()
+                self.total_points = 0
 
             # Reset level state
             self.game_started = False

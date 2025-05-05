@@ -21,6 +21,7 @@ class Main:
         self.window_size = 500
         self.canvas = None
         self.exit = False
+        self.fps_list = []
 
     # Will initialise the beginning of the game, create all essential objects etc.
     def setup(self):
@@ -52,29 +53,62 @@ class Main:
         # Draw modifier information
         self.draw_modifier_info()
 
+        # Draw big level text if new level is reached
+        if self.game_manager.level_manager.time_spent == 0:
+            self.draw_level_text()
+
         pygame.display.flip()
 
     def draw_ui(self):
         font = pygame.font.Font('freesansbold.ttf', 12)
 
-        # Draw lives info
-        lives = font.render(f'Level: {self.game_manager.level_manager.current_level}                  Lives: {self.game_manager.lives}', True, "white")
-        lives_rect = lives.get_rect()
-        lives_rect.topleft = (5, 4)
-        self.canvas.blit(lives, lives_rect)
+        # Draw top right info
+        level_text = font.render(f'Level: {self.game_manager.level_manager.current_level}', True, "white")
+        level_rect = level_text.get_rect()
+        level_rect.topleft = (5, 4)
+        lives_text = font.render(f'Lives: {self.game_manager.lives}', True, "white")
+        lives_rect = lives_text.get_rect()
+        lives_rect.center = (self.window_size / 4, 10)
+        self.canvas.blit(lives_text, lives_rect)
+        self.canvas.blit(level_text, level_rect)
 
-        # Draw timer
+        # Calculate FPS using average from last 30 frames
+        self.fps_list.append(1 / self.game_manager.dt)
+        if len(self.fps_list) > 30:
+            self.fps_list.pop(0)
+        fps = round(sum(self.fps_list) / len(self.fps_list), 1)
+
+        # Draw info
         formatted_time = str(timedelta(seconds=math.floor(self.game_manager.elapsed_time))).removeprefix('0:')
+        fps_text = font.render(f'FPS: {fps}', True, "white")
+        fps_rect = fps_text.get_rect()
+        fps_rect.center = (self.window_size / 4 * 3, 10)
         timer = font.render(f'{formatted_time}', True, "white")
         timer_rect = timer.get_rect()
-        timer_rect.center = (self.window_size - 25, 10)
+        timer_rect.topright = (self.window_size - 5, 4)
         self.canvas.blit(timer, timer_rect)
+        self.canvas.blit(fps_text, fps_rect)
 
         # Draw score info
         score_text = font.render(str(self.game_manager.level_points + self.game_manager.total_points), True, "white")
         score_rect = score_text.get_rect()
         score_rect.center = (self.window_size / 2, 10)
         self.canvas.blit(score_text, score_rect)
+
+    def draw_level_text(self):
+        # Big level text
+        font = pygame.font.Font('freesansbold.ttf', 50)
+        level_text = font.render(f'Level {self.game_manager.level_manager.current_level}', True, "white")
+        level_rect = level_text.get_rect()
+        level_rect.center = (self.window_size / 2, self.window_size / 2)
+        self.canvas.blit(level_text, level_rect)
+
+        # Small text below
+        small_font = pygame.font.Font('freesansbold.ttf', 15)
+        small_text = small_font.render('Press up to start', True, "white")
+        small_rect = small_text.get_rect()
+        small_rect.center = (self.window_size / 2, self.window_size / 2 + 40)
+        self.canvas.blit(small_text, small_rect)
 
     def draw_modifier_info(self):
         font = pygame.font.Font('freesansbold.ttf', 12)
@@ -161,7 +195,7 @@ class Main:
             self.handle_events()
 
             pygame.display.update()
-            self.game_manager.dt = clock.tick(60) / 1000
+            self.game_manager.dt = clock.tick(999) / 1000
             
             if self.game_manager.game_started:
                 self.game_manager.tick += 1
@@ -187,13 +221,20 @@ class Main:
     def handle_endgame(self):
         highscores = self.get_highscores()
 
+        # Check if the score is a highscore.
+        # If there are less than 5 highscores, or if the score is higher than the lowest highscore.
         is_highscore = len(highscores) < 5 or self.game_manager.total_points > min(highscores.values())
 
+        # If the score is a highscore, ask for the player's name and add to highscores.
         if is_highscore:
             player_name = self.get_name()
-            highscores[player_name] = self.game_manager.total_points
-            sorted_highscores = dict(sorted(highscores.items(), key=lambda i: i[1], reverse=True)[:5])
-            self.save_highscores(sorted_highscores)
+
+            # If the player is not in the highscores, add them.
+            # Otherwise, check if the score is higher than their previous score.
+            if highscores.get(player_name) is None or self.game_manager.total_points > highscores[player_name]:
+                highscores[player_name] = self.game_manager.total_points
+                sorted_highscores = dict(sorted(highscores.items(), key=lambda i: i[1], reverse=True)[:5])
+                self.save_highscores(sorted_highscores)
             
         self.game_manager.name_entered = True
 
