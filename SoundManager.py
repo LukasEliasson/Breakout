@@ -1,16 +1,22 @@
-import pygame
 from pygame import mixer
 
 class SoundManager:
 
     def __init__(self):
+        # Initialise mixer
         mixer.init()
+
+        # Load music
         mixer.music.load('sfx/atari_st_beat.mp3')
-        self.paddle_hit_sound = pygame.mixer.Sound('sfx/paddle_hit.wav')
-        self.brick_hit_sound = pygame.mixer.Sound('sfx/brick_hit.wav')
-        self.new_row_sound = pygame.mixer.Sound('sfx/punch.wav')
-        self.playing_music = False
-        self.extravaganza = False
+
+        # Load sound effects
+        self.paddle_hit_sound = mixer.Sound('sfx/paddle_hit.wav')
+        self.brick_hit_sound = mixer.Sound('sfx/brick_hit.wav')
+        self.new_row_sound = mixer.Sound('sfx/punch.wav')
+        self.wall_hit_sound = mixer.Sound('sfx/wall_hit.wav')
+
+        self.playing_music = False   # Indicates if music is currently playing
+        self.extravaganza = False   # Indicates if extravaganza music is currently playing
 
     def start_music(self):
         mixer.music.set_volume(0.05)
@@ -29,6 +35,9 @@ class SoundManager:
 
     def play_new_row_sound(self):
         self.new_row_sound.play()
+    
+    def play_wall_hit_sound(self):
+        self.wall_hit_sound.play()
 
     def start_extravaganza(self):
         mixer.music.load('sfx/extravaganza.wav')

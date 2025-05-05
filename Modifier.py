@@ -8,22 +8,48 @@ class Modifier:
     """
     Class representing a modifier that can be dropped by bricks when they are destroyed. These can have various effects on the game, such as changing the speed of the ball, changing the size of the paddle, or adding extra balls.
 
-    Attributes:
-        x (int): The x-coordinate of the modifier's position.
-        y (int): The y-coordinate of the modifier's position.
-        name (str): The name of the modifier.
-        type (str): The type of the modifier (positive, negative, special).
-        radius (int): The radius of the visible dropped modifier.
-        color (str): The color of the visible dropped modifier. Randomly chosen from a list of colors.
-        fall_speed (int): The speed at which the modifier falls.
-        time_remaining (float): The time remaining for the modifier to be active.
-        activated_at (int): The tick at which the modifier was activated.
-        deactivated_at (int): The tick at which the modifier was deactivated.
-        is_active (bool): Indicates if the modifier is currently active.
-        brick (Brick): The brick that the modifier is associated with.
+    Attributes
+    ----------
+    x : int
+        The x-coordinate of the modifier's position.
+    y : int
+        The y-coordinate of the modifier's position.
+    name : str
+        The name of the modifier.
+    type : str
+        The type of the modifier (e.g., "positive", "negative", "special").
+    radius : int
+        The radius of the modifier.
+    color : str
+        The color of the modifier. Randomly chosen from a list of colors.
+    fall_speed : int
+        The speed at which the modifier falls down the screen.
+    time_remaining : float
+        The time remaining for the modifier to be active. If None, the modifier will not deactivate automatically.
+    is_active : bool
+        Indicates if the modifier is currently active.
+    brick : Brick
+        The brick that the modifier is associated with. This is the brick it will be dropped from.
+    
+    Methods
+    -------
+    set_brick(brick: Brick) -> None
+        Sets the brick that the modifier is associated with.
+    move_to_brick() -> None
+        Moves the modifier to the position of the brick it is associated with.
+    fall(dt: float) -> None
+        Moves the modifier downwards by its fall speed.
+    is_caught(paddle: Paddle) -> bool
+        Checks if the modifier is caught by the paddle.
+    is_out_of_bounds(window_size: int) -> bool
+        Checks if the modifier is out of bounds.
+    activate(game_manager: GameManager) -> None
+        Activates the modifier. This method is called when the modifier is caught by the paddle.
+    deactivate(game_manager: GameManager) -> None
+        Deactivates the modifier. This method is called when the modifier's time limit is reached or when the game ends.
     """
 
-    def __init__(self, name: str, type: str, ball_speed: int=5, paddle_size: int=50, time_remaining: float=None):
+    def __init__(self, name: str, type: str, duration: float=None):
         self.x = 0
         self.y = 0
         self.name = name
@@ -35,9 +61,7 @@ class Modifier:
         self.color = random.choice(colors)
 
         self.fall_speed = 120
-        self.time_remaining = time_remaining
-        self.activated_at = None
-        self.deactivated_at = None
+        self.time_remaining = duration
         self.is_active = False
         self.brick = None
 
@@ -84,6 +108,7 @@ class Modifier:
         if not isinstance(self.brick, Brick):
             raise ValueError("Associated brick must be an instance of the Brick class")
 
+        # Set coordinates to the bottom of the associated brick
         self.x = self.brick.x + self.brick.width / 2
         self.y = self.brick.y + self.brick.height
 
@@ -92,7 +117,8 @@ class Modifier:
 
     Parameters
     ----------
-    None
+    dt : float
+        The time delta to move the modifier in relation to.
 
     Returns
     -------
@@ -102,7 +128,7 @@ class Modifier:
     ------
     None
     """
-    def fall(self, dt) -> None:
+    def fall(self, dt: float) -> None:
         self.y += self.fall_speed * dt
 
     """
@@ -157,71 +183,7 @@ class Modifier:
 
         # The modifier can only move downwards, so it is out of bounds if its lowest point is greater than the window size
         return (self.y - self.radius) > window_size
-    
-    """
-    Sets the tick at which the modifier was activated.
 
-    Parameters
-    ----------
-    time : int
-        The tick at which the modifier was activated.
-    
-    Returns
-    -------
-    None
-
-    Raises
-    ------
-    ValueError
-        If the time is not greater than 0.
-    """
-    def set_activated_time(self, time: int) -> None:
-        if not time > 0:
-            raise ValueError("Time must be greater than 0")
-        
-        self.activated_at = time
-
-    """
-    Sets the tick at which the modifier was deactivated.
-
-    Parameters
-    ----------
-    time : int
-        The tick at which the modifier was deactivated.
-    
-    Returns
-    -------
-    None
-
-    Raises
-    ------
-    ValueError
-        If the time is not greater than 0.
-    """
-    def set_deactivated_time(self, time: int) -> None:
-        if not time > 0:
-            raise ValueError("Time must be greater than 0")
-
-        self.deactivated_at = time 
-
-    """
-    Sets the duration attribute of the modifier. This is the time in seconds that the modifier will be active for. The duration is converted to milliseconds.
-
-    Parameters
-    ----------
-    duration : int
-        The duration of the modifier in seconds.
-    
-    Returns
-    -------
-    None
-
-    Raises
-    ------
-    ValueError
-        If the duration is not greater than 0.
-    """
-    def set_duration(self, duration: int) -> None:
         if not duration > 0:
             raise ValueError("Duration must be greater than 0")
 
@@ -262,9 +224,6 @@ class Modifier:
         # Remove the modifier from the dropped modifiers list
         game_manager.dropped_modifiers.remove(self)
 
-        # Sets the time at which the modifier was activated
-        self.set_activated_time(game_manager.tick)
-
         # Activate the modifier based on its name
         match self.name:
             case "Fast Ball":
@@ -298,9 +257,6 @@ class Modifier:
                 for ball in game_manager.balls:
                     ball.speed += 1000
                     ball.death_disabled = True
-                
-                # Set the time at which the modifier was activated
-                self.set_activated_time(game_manager.tick)
 
                 if not game_manager.sound_manager.extravaganza:
                     # Play the extravaganza music
